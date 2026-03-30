@@ -1,87 +1,153 @@
-# QR Sconti Manager — Supabase Edition
+# QR Sconti Manager
 
-Backend Node.js + Express con database **PostgreSQL gratuito su Supabase**.
+Applicazione web per la **generazione e devalidazione di buoni sconto con QR code**, pensata per team distribuiti su più postazioni. Ogni operatore accede dal browser — nessuna installazione richiesta.
+
+**Stack:** Node.js · Express · PostgreSQL (Supabase) · JWT
 
 ---
 
-## Setup in 5 passi
+## Funzionalità
 
-### 1. Crea il database su Supabase (gratis, per sempre)
+- Generazione di buoni sconto con QR code (valore fisso in € o percentuale)
+- Devalidazione buoni tramite scansione QR o inserimento manuale del codice
+- Protezione da race condition: nessun buono può essere usato due volte contemporaneamente
+- Gestione utenti con tre ruoli: `operatore`, `manager`, `admin`
+- Dashboard con statistiche in tempo reale
+- Export CSV dell'archivio buoni
+- Log completo di tutte le operazioni
 
-1. Vai su [supabase.com](https://supabase.com) e crea un account
-2. Clicca **New Project**, scegli un nome e una password per il DB
-3. Aspetta ~2 minuti che il progetto venga creato
+---
 
-### 2. Crea le tabelle
+## Architettura
 
-1. Nel pannello Supabase, vai su **SQL Editor → New Query**
-2. Copia e incolla tutto il contenuto di `database.sql`
-3. Clicca **Run**
-
-### 3. Configura le credenziali
-
-1. In Supabase vai su **Settings → Database → Connection string → URI**
-2. Copia la stringa (contiene già host, porta, utente)
-3. Crea il file `.env` copiando `.env.example`:
-   ```
-   cp .env.example .env
-   ```
-4. Incolla la stringa in `DATABASE_URL` e sostituisci `[YOUR-PASSWORD]` con la password scelta al passo 1
-
-### 4. Installa le dipendenze
-
-```bash
-npm install
+```
+Browser (qualsiasi PC)
+      │
+      ▼
+Express server  ──►  Supabase (PostgreSQL cloud)
+  + Frontend
+  statico
 ```
 
-> ⚠️ Se hai la vecchia versione con MySQL, il pacchetto `mysql2` è stato sostituito con `pg`.
-> `npm install` si occupa di tutto automaticamente.
+Il backend serve anche il frontend statico — un unico servizio da deployare.
 
-### 5. Avvia il server
+---
+
+## Deploy in cloud (consigliato)
+
+L'applicazione è predisposta per il deploy su **Render** (gratuito) con database **Supabase** (gratuito).
+
+### 1. Crea il database su Supabase
+
+1. Registrati su [supabase.com](https://supabase.com) → **New Project**
+2. Vai su **SQL Editor → New Query**, incolla il contenuto di `database.sql` e clicca **Run**
+3. Vai su **Connect → Session pooler** e copia la stringa URI
+
+### 2. Deploy su Render
+
+1. Registrati su [render.com](https://render.com) con il tuo account GitHub
+2. **New → Web Service** → seleziona questo repository
+3. Render rileva automaticamente `render.yaml` — non serve configurare nulla
+4. Aggiungi le variabili d'ambiente (vedi sezione sotto)
+5. Clicca **Create Web Service** — in 2-3 minuti l'app è online
+
+### Variabili d'ambiente richieste
+
+| Variabile | Descrizione |
+|---|---|
+| `DATABASE_URL` | Stringa di connessione Supabase (Session pooler, porta 5432) |
+| `JWT_SECRET` | Stringa segreta per la firma dei token JWT (min. 32 caratteri) |
+| `SESSION_SECRET` | Stringa segreta per le sessioni Express |
+| `PORT` | Porta del server (default: `3000`) |
+
+> ⚠️ Non committare mai il file `.env` nel repository. È già escluso da `.gitignore`.
+
+---
+
+## Esecuzione in locale
+
+### Prerequisiti
+
+- Node.js 18+
+- Un progetto Supabase attivo con le tabelle create (vedi `database.sql`)
+
+### Setup
 
 ```bash
+# 1. Installa le dipendenze
+npm install
+
+# 2. Configura le variabili d'ambiente
+cp .env.example .env
+# Modifica .env con la tua stringa DATABASE_URL e i segreti JWT
+
+# 3. Avvia il server
 npm start        # produzione
-npm run dev      # sviluppo (auto-reload)
+npm run dev      # sviluppo con auto-reload
 ```
 
 Apri il browser su `http://localhost:3000`
 
-**Credenziali iniziali:** `admin` / `admin123` — cambia la password subito!
+**Credenziali iniziali:** `admin` / `admin123` — cambia la password al primo accesso.
 
 ---
 
-## Differenze rispetto alla versione MySQL
+## Build come eseguibile Windows (.exe)
 
-| Aspetto | Prima (MySQL) | Ora (Supabase/PostgreSQL) |
-|---|---|---|
-| Driver | `mysql2` | `pg` |
-| Placeholder query | `?` | `$1, $2, ...` (gestito automaticamente dal wrapper in `db.js`) |
-| CURDATE() | `CURDATE()` | `CURRENT_DATE` |
-| LIKE case-insensitive | `LIKE` | `ILIKE` |
-| Formattazione date | `DATE_FORMAT(...)` | `TO_CHAR(...)` |
-| Concatenazione | `CONCAT(a, b)` | `a \|\| b` |
-| Boolean | `TINYINT(1)` | `BOOLEAN` |
-| Auto increment | `AUTO_INCREMENT` | `SERIAL` |
-| Errore duplicato | `ER_DUP_ENTRY` | codice `23505` |
+Per distribuire l'app come programma standalone su PC Windows (senza installare Node.js):
 
-Il file `src/db.js` include un wrapper che rende trasparenti la maggior parte di queste differenze.
+```bash
+# Richiede Node.js solo sulla macchina che esegue la build
+build.bat
+```
+
+Al termine trovi nella cartella `dist/`:
+
+```
+dist/
+├── QRScontiManager.exe   # il programma
+├── public/               # frontend (non spostare)
+└── .env                  # configurare prima della distribuzione
+```
+
+Copia la cartella `dist/` su ogni PC — doppio clic sull'exe apre automaticamente il browser.
 
 ---
 
 ## Struttura del progetto
 
 ```
-qr-sconti-backend/
 ├── src/
-│   ├── server.js          # Entry point Express
-│   ├── db.js              # Connessione PostgreSQL (pool + wrapper mysql2-compatibile)
-│   ├── auth.js            # JWT middleware
+│   ├── server.js           # Entry point Express
+│   ├── db.js               # Pool PostgreSQL con wrapper compatibile mysql2
+│   ├── auth.js             # Middleware JWT
 │   └── routes/
-│       ├── auth.js        # Login, gestione utenti
-│       └── buoni.js       # CRUD buoni, genera, devalida, export CSV
+│       ├── auth.js         # Login, gestione utenti
+│       └── buoni.js        # Generazione, devalidazione, export CSV
 ├── public/
-│   └── index.html         # Frontend SPA
-├── database.sql           # Schema PostgreSQL — incollare in Supabase SQL Editor
-├── .env.example           # Template variabili ambiente
+│   └── index.html          # Frontend SPA (vanilla JS)
+├── database.sql            # Schema PostgreSQL per Supabase
+├── render.yaml             # Configurazione deploy Render
+├── build.bat               # Script build exe Windows (pkg)
+├── .env.example            # Template variabili d'ambiente
 └── package.json
 ```
+
+---
+
+## Ruoli utente
+
+| Ruolo | Permessi |
+|---|---|
+| `operatore` | Verifica e devalida buoni |
+| `manager` | Tutto quanto sopra + genera buoni + export CSV |
+| `admin` | Tutto quanto sopra + gestione utenti |
+
+---
+
+## Note tecniche
+
+- Il frontend usa `window.location.origin` come base URL per le API — funziona sia in locale che in cloud senza modifiche
+- La devalidazione usa `SELECT ... FOR UPDATE` per prevenire utilizzi doppi in caso di accessi concorrenti
+- I token JWT hanno durata di 12 ore
+- Il driver `pg` è wrappato per mantenere la stessa interfaccia di `mysql2` (`[rows, fields]`) — le route non richiedono modifiche per cambiare database
