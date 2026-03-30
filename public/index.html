@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QR Sconti Manager</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap');
+
+:root {
+  --bg: #0a0a0f;
+  --surface: #12121a;
+  --surface2: #1a1a28;
+  --surface3: #22223a;
+  --border: #2a2a45;
+  --accent: #6c63ff;
+  --accent2: #ff6584;
+  --accent3: #43e8b0;
+  --text: #f0f0fa;
+  --text2: #9090b0;
+  --text3: #5a5a80;
+  --valid: #43e8b0;
+  --invalid: #ff6584;
+  --warning: #ffb347;
+  --radius: 16px;
+  --shadow: 0 8px 40px rgba(0,0,0,0.6);
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; overflow-x:hidden; }
+body::before { content:''; position:fixed; top:-50%; left:-50%; width:200%; height:200%; background:radial-gradient(ellipse at 20% 20%,rgba(108,99,255,.08) 0%,transparent 50%),radial-gradient(ellipse at 80% 80%,rgba(67,232,176,.05) 0%,transparent 50%); pointer-events:none; z-index:0; }
+
+/* LOGIN */
+#loginScreen { position:fixed; inset:0; display:flex; align-items:center; justify-content:center; z-index:1000; background:var(--bg); }
+.login-card { background:var(--surface); border:1px solid var(--border); border-radius:24px; padding:56px 48px; width:420px; box-shadow:var(--shadow); animation:slideUp .5s cubic-bezier(.16,1,.3,1); }
+@keyframes slideUp { from{opacity:0;transform:translateY(30px)} to{opacity:1;transform:translateY(0)} }
+.login-logo { font-family:'DM Serif Display',serif; font-size:2rem; background:linear-gradient(135deg,var(--accent),var(--accent3)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; margin-bottom:8px; }
+.login-sub { color:var(--text2); font-size:.9rem; margin-bottom:40px; }
+.login-form { display:flex; flex-direction:column; gap:16px; }
+
+/* INPUTS */
+.field-group { display:flex; flex-direction:column; gap:6px; }
+.field-label { font-size:.78rem; font-weight:600; color:var(--text2); letter-spacing:.08em; text-transform:uppercase; }
+input,select,textarea { background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:12px 16px; color:var(--text); font-family:'DM Sans',sans-serif; font-size:.95rem; outline:none; transition:border-color .2s,box-shadow .2s; width:100%; }
+input:focus,select:focus { border-color:var(--accent); box-shadow:0 0 0 3px rgba(108,99,255,.15); }
+select option { background:var(--surface2); }
+
+/* BUTTONS */
+.btn { display:inline-flex; align-items:center; justify-content:center; gap:8px; padding:12px 24px; border-radius:10px; border:none; font-family:'DM Sans',sans-serif; font-size:.9rem; font-weight:600; cursor:pointer; transition:all .2s; letter-spacing:.02em; }
+.btn-primary { background:linear-gradient(135deg,var(--accent),#8b5cf6); color:white; }
+.btn-primary:hover { transform:translateY(-1px); box-shadow:0 6px 24px rgba(108,99,255,.4); }
+.btn-danger { background:rgba(255,101,132,.15); color:var(--invalid); border:1px solid rgba(255,101,132,.3); }
+.btn-danger:hover { background:rgba(255,101,132,.25); }
+.btn-success { background:rgba(67,232,176,.15); color:var(--valid); border:1px solid rgba(67,232,176,.3); }
+.btn-ghost { background:transparent; color:var(--text2); border:1px solid var(--border); }
+.btn-ghost:hover { background:var(--surface2); color:var(--text); }
+.btn-full { width:100%; }
+.btn:disabled { opacity:.4; cursor:not-allowed; transform:none!important; }
+.login-error { color:var(--invalid); font-size:.85rem; text-align:center; min-height:20px; }
+
+/* LAYOUT */
+#mainApp { display:none; position:relative; z-index:1; }
+.topbar { background:var(--surface); border-bottom:1px solid var(--border); padding:0 32px; height:64px; display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:100; backdrop-filter:blur(20px); }
+.topbar-brand { font-family:'DM Serif Display',serif; font-size:1.4rem; background:linear-gradient(135deg,var(--accent),var(--accent3)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+.topbar-nav { display:flex; gap:4px; }
+.nav-btn { padding:8px 18px; border-radius:8px; border:none; background:transparent; color:var(--text2); font-family:'DM Sans',sans-serif; font-size:.88rem; font-weight:500; cursor:pointer; transition:all .2s; display:flex; align-items:center; gap:6px; }
+.nav-btn:hover { background:var(--surface2); color:var(--text); }
+.nav-btn.active { background:rgba(108,99,255,.15); color:var(--accent); }
+.topbar-right { display:flex; align-items:center; gap:12px; }
+.user-badge { background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:6px 12px; font-size:.82rem; color:var(--text2); display:flex; align-items:center; gap:6px; }
+.user-role { font-size:.7rem; padding:2px 6px; border-radius:4px; background:rgba(108,99,255,.2); color:var(--accent); font-weight:600; }
+
+/* PAGES */
+.page { display:none; padding:40px 32px; max-width:1200px; margin:0 auto; }
+.page.active { display:block; animation:fadeIn .3s ease; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+.page-title { font-family:'DM Serif Display',serif; font-size:2rem; margin-bottom:4px; }
+.page-sub { color:var(--text2); font-size:.9rem; margin-bottom:32px; }
+
+/* CARDS */
+.card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:28px; }
+.card-title { font-size:1rem; font-weight:600; margin-bottom:20px; display:flex; align-items:center; gap:8px; }
+
+/* STATS */
+.stats-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:16px; margin-bottom:32px; }
+.stat-card { background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:24px; position:relative; overflow:hidden; }
+.stat-card::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; }
+.stat-card.purple::before { background:linear-gradient(90deg,var(--accent),transparent); }
+.stat-card.green::before  { background:linear-gradient(90deg,var(--valid),transparent); }
+.stat-card.red::before    { background:linear-gradient(90deg,var(--invalid),transparent); }
+.stat-card.orange::before { background:linear-gradient(90deg,var(--warning),transparent); }
+.stat-value { font-family:'DM Serif Display',serif; font-size:2.4rem; line-height:1; }
+.stat-label { color:var(--text2); font-size:.8rem; margin-top:6px; }
+.stat-icon  { font-size:1.8rem; margin-bottom:8px; }
+
+/* GENERATE */
+.gen-grid { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+.gen-grid .full { grid-column:1/-1; }
+.discount-preview { background:linear-gradient(135deg,rgba(108,99,255,.1),rgba(67,232,176,.05)); border:1px solid var(--border); border-radius:12px; padding:20px; text-align:center; margin:20px 0; }
+.discount-big { font-family:'DM Serif Display',serif; font-size:3rem; background:linear-gradient(135deg,var(--accent),var(--accent3)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+.discount-label { color:var(--text2); font-size:.85rem; margin-top:4px; }
+
+/* SCAN */
+.scan-container { display:grid; grid-template-columns:1fr 1fr; gap:24px; }
+.scan-code-input { font-size:1.1rem; letter-spacing:.08em; text-align:center; font-weight:600; text-transform:uppercase; }
+.scan-result { border-radius:var(--radius); padding:28px; text-align:center; border:1px solid var(--border); background:var(--surface); min-height:280px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; transition:all .4s cubic-bezier(.16,1,.3,1); }
+.scan-result.valid   { border-color:rgba(67,232,176,.4);  background:rgba(67,232,176,.05);  animation:pulseGreen .6s ease; }
+.scan-result.invalid { border-color:rgba(255,101,132,.4); background:rgba(255,101,132,.05); animation:pulseRed .6s ease; }
+.scan-result.used    { border-color:rgba(255,179,71,.4);  background:rgba(255,179,71,.05); }
+@keyframes pulseGreen { 0%{box-shadow:0 0 0 0 rgba(67,232,176,.4)} 70%{box-shadow:0 0 0 20px rgba(67,232,176,0)} 100%{box-shadow:0 0 0 0 rgba(67,232,176,0)} }
+@keyframes pulseRed   { 0%{box-shadow:0 0 0 0 rgba(255,101,132,.4)} 70%{box-shadow:0 0 0 20px rgba(255,101,132,0)} 100%{box-shadow:0 0 0 0 rgba(255,101,132,0)} }
+.result-icon { font-size:4rem; line-height:1; }
+.result-title { font-family:'DM Serif Display',serif; font-size:1.6rem; }
+.result-detail { color:var(--text2); font-size:.9rem; text-align:center; line-height:1.6; }
+.result-discount { font-family:'DM Serif Display',serif; font-size:2.5rem; background:linear-gradient(135deg,var(--accent),var(--accent3)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+
+/* TABLE */
+.table-wrapper { overflow-x:auto; margin-top:16px; }
+table { width:100%; border-collapse:collapse; font-size:.88rem; }
+th { text-align:left; padding:10px 14px; color:var(--text3); font-weight:600; font-size:.75rem; letter-spacing:.06em; text-transform:uppercase; border-bottom:1px solid var(--border); }
+td { padding:12px 14px; border-bottom:1px solid rgba(42,42,69,.5); vertical-align:middle; }
+tr:hover td { background:rgba(108,99,255,.03); }
+tr:last-child td { border-bottom:none; }
+.badge { display:inline-flex; align-items:center; gap:4px; padding:3px 10px; border-radius:20px; font-size:.75rem; font-weight:600; }
+.badge-valid   { background:rgba(67,232,176,.15);  color:var(--valid); }
+.badge-used    { background:rgba(255,179,71,.15);   color:var(--warning); }
+.badge-expired { background:rgba(255,101,132,.15);  color:var(--invalid); }
+.code-mono { font-family:'Courier New',monospace; font-size:.82rem; background:var(--surface2); padding:3px 8px; border-radius:6px; letter-spacing:.05em; }
+
+/* FILTERS */
+.filters { display:flex; gap:10px; margin-bottom:20px; flex-wrap:wrap; }
+.search-input { flex:1; min-width:200px; }
+.filter-select { width:160px; }
+
+/* ADMIN */
+.users-list { display:flex; flex-direction:column; gap:10px; margin-top:16px; }
+.user-row { display:flex; align-items:center; justify-content:space-between; background:var(--surface2); border:1px solid var(--border); border-radius:10px; padding:14px 18px; }
+.user-info { display:flex; flex-direction:column; gap:3px; }
+.user-name { font-weight:600; font-size:.95rem; }
+.user-meta { color:var(--text2); font-size:.8rem; }
+
+/* TOAST */
+#toast { position:fixed; bottom:32px; right:32px; background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:14px 20px; font-size:.9rem; box-shadow:var(--shadow); z-index:9999; transform:translateY(100px); opacity:0; transition:all .4s cubic-bezier(.16,1,.3,1); max-width:320px; display:flex; align-items:center; gap:10px; }
+#toast.show { transform:translateY(0); opacity:1; }
+#toast.success { border-color:rgba(67,232,176,.4); }
+#toast.error   { border-color:rgba(255,101,132,.4); }
+
+/* MODAL */
+.modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.7); z-index:500; display:none; align-items:center; justify-content:center; backdrop-filter:blur(4px); }
+.modal-overlay.open { display:flex; }
+.modal { background:var(--surface); border:1px solid var(--border); border-radius:20px; padding:36px; width:480px; max-width:95vw; box-shadow:var(--shadow); animation:slideUp .3s cubic-bezier(.16,1,.3,1); }
+.modal-title { font-family:'DM Serif Display',serif; font-size:1.5rem; margin-bottom:20px; }
+.modal-actions { display:flex; gap:10px; justify-content:flex-end; margin-top:24px; }
+
+/* PROGRESS */
+.progress-bar { background:var(--surface2); border-radius:999px; height:6px; overflow:hidden; margin:8px 0; }
+.progress-fill { height:100%; background:linear-gradient(90deg,var(--accent),var(--accent3)); border-radius:999px; transition:width .3s ease; width:0%; }
+
+/* LOADER */
+.spinner { width:20px; height:20px; border:2px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin .7s linear infinite; display:inline-block; }
+@keyframes spin { to{transform:rotate(360deg)} }
+
+.divider { height:1px; background:var(--border); margin:24px 0; }
+
+::-webkit-scrollbar { width:6px; height:6px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="login-logo">◈ QR Sconti</div>
+    <div class="login-sub">Gestione buoni sconto aziendali</div>
+    <div class="login-form">
+      <div class="field-group">
+        <label class="field-label">Username</label>
+        <input type="text" id="loginUser" placeholder="Inserisci username" autocomplete="username">
+      </div>
+      <div class="field-group">
+        <label class="field-label">Password</label>
+        <input type="password" id="loginPass" placeholder="••••••••" autocomplete="current-password">
+      </div>
+      <div class="login-error" id="loginError"></div>
+      <button class="btn btn-primary btn-full" id="btnLogin" onclick="doLogin()">Accedi</button>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN APP -->
+<div id="mainApp">
+  <div class="topbar">
+    <div class="topbar-brand">◈ QR Sconti</div>
+    <nav class="topbar-nav">
+      <button class="nav-btn active" onclick="goPage('dashboard')" id="nav-dashboard">◎ Dashboard</button>
+      <button class="nav-btn" onclick="goPage('genera')" id="nav-genera">⊕ Genera QR</button>
+      <button class="nav-btn" onclick="goPage('scansiona')" id="nav-scansiona">⊡ Scansiona</button>
+      <button class="nav-btn" onclick="goPage('archivio')" id="nav-archivio">≡ Archivio</button>
+      <button class="nav-btn" onclick="goPage('admin')" id="nav-admin" style="display:none">✦ Utenti</button>
+    </nav>
+    <div class="topbar-right">
+      <div class="user-badge">
+        <span id="topbarUser">—</span>
+        <span class="user-role" id="topbarRole">—</span>
+      </div>
+      <button class="btn btn-ghost" style="padding:8px 14px;font-size:.82rem;" onclick="doLogout()">Esci</button>
+    </div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div class="page active" id="page-dashboard">
+    <div class="page-title">Dashboard</div>
+    <div class="page-sub">Panoramica dei buoni sconto</div>
+    <div class="stats-grid">
+      <div class="stat-card purple"><div class="stat-icon">◈</div><div class="stat-value" id="stat-total">—</div><div class="stat-label">Buoni Totali</div></div>
+      <div class="stat-card green"><div class="stat-icon">✓</div><div class="stat-value" id="stat-valid">—</div><div class="stat-label">Validi</div></div>
+      <div class="stat-card orange"><div class="stat-icon">✗</div><div class="stat-value" id="stat-used">—</div><div class="stat-label">Utilizzati</div></div>
+      <div class="stat-card red"><div class="stat-icon">⊘</div><div class="stat-value" id="stat-expired">—</div><div class="stat-label">Scaduti</div></div>
+    </div>
+    <div class="card">
+      <div class="card-title">⟳ Ultimi buoni generati</div>
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Codice</th><th>Sconto</th><th>Note</th><th>Scadenza</th><th>Stato</th></tr></thead>
+          <tbody id="dashboardBody"><tr><td colspan="5" style="text-align:center;color:var(--text3);padding:30px">Caricamento...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- GENERA -->
+  <div class="page" id="page-genera">
+    <div class="page-title">Genera QR Code</div>
+    <div class="page-sub">Crea nuovi buoni sconto con QR code univoci</div>
+    <div class="card">
+      <div class="card-title">⊕ Parametri buono</div>
+      <div class="gen-grid">
+        <div class="field-group">
+          <label class="field-label">Valore sconto</label>
+          <input type="number" id="genValore" placeholder="es. 20" min="0" max="9999" step="0.5">
+        </div>
+        <div class="field-group">
+          <label class="field-label">Tipo sconto</label>
+          <select id="genTipo">
+            <option value="%">Percentuale (%)</option>
+            <option value="€">Importo fisso (€)</option>
+          </select>
+        </div>
+        <div class="field-group">
+          <label class="field-label">Numero buoni</label>
+          <input type="number" id="genQuantita" value="1" min="1" max="500">
+        </div>
+        <div class="field-group">
+          <label class="field-label">Data scadenza</label>
+          <input type="date" id="genScadenza">
+        </div>
+        <div class="field-group full">
+          <label class="field-label">Note / Descrizione</label>
+          <input type="text" id="genNote" placeholder="es. Campagna estate 2025, Cliente VIP...">
+        </div>
+        <div class="field-group full">
+          <label class="field-label">Nome azienda sul PDF</label>
+          <input type="text" id="genAzienda" placeholder="La Tua Azienda S.r.l.">
+        </div>
+      </div>
+      <div class="discount-preview">
+        <div class="discount-big" id="previewSconto">—</div>
+        <div class="discount-label" id="previewLabel">inserisci il valore sconto</div>
+      </div>
+      <div id="genProgress" style="display:none">
+        <div style="color:var(--text2);font-size:.85rem;margin-bottom:6px" id="genProgressLabel">Generazione in corso...</div>
+        <div class="progress-bar"><div class="progress-fill" id="genProgressFill"></div></div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:8px">
+        <button class="btn btn-primary" onclick="generaQR()" id="btnGenera" style="flex:1">⊕ Genera &amp; Scarica PDF</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCANSIONA -->
+  <div class="page" id="page-scansiona">
+    <div class="page-title">Scansiona Buono</div>
+    <div class="page-sub">Verifica e devalida i buoni sconto</div>
+    <div class="scan-container">
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <div class="card">
+          <div class="card-title">⊡ Inserisci codice</div>
+          <div class="field-group" style="margin-bottom:12px">
+            <label class="field-label">Codice buono</label>
+            <input type="text" id="scanCode" class="scan-code-input" placeholder="QRS-XXXXXXXX"
+              oninput="this.value=this.value.toUpperCase()"
+              onkeydown="if(event.key==='Enter')cercaBuono()">
+          </div>
+          <button class="btn btn-primary btn-full" onclick="cercaBuono()" id="btnCerca">🔍 Cerca buono</button>
+          <div class="divider"></div>
+          <div style="color:var(--text2);font-size:.82rem;line-height:1.6">
+            💡 Con uno scanner USB/Bluetooth posiziona il cursore nel campo e scansiona direttamente.
+          </div>
+        </div>
+        <div class="card" id="scanActionCard" style="display:none">
+          <div class="card-title">⚡ Azione</div>
+          <button class="btn btn-danger btn-full" id="btnDevalida" onclick="devalidaBuono()" style="font-size:1rem;padding:16px">
+            ✗ Devalida questo buono
+          </button>
+          <div style="color:var(--text3);font-size:.78rem;margin-top:10px;text-align:center">
+            Questa azione è irreversibile.
+          </div>
+        </div>
+      </div>
+      <div class="scan-result" id="scanResult">
+        <div style="font-size:3rem;opacity:.2">⊡</div>
+        <div style="color:var(--text3);font-size:.9rem">In attesa di scansione...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ARCHIVIO -->
+  <div class="page" id="page-archivio">
+    <div class="page-title">Archivio Buoni</div>
+    <div class="page-sub">Tutti i buoni sconto generati</div>
+    <div class="filters">
+      <input type="text" class="search-input" id="filterSearch" placeholder="🔍 Cerca codice, note..." oninput="debounceArchivio()">
+      <select class="filter-select" id="filterStato" onchange="loadArchivio()">
+        <option value="">Tutti gli stati</option>
+        <option value="valido">Validi</option>
+        <option value="usato">Utilizzati</option>
+        <option value="scaduto">Scaduti</option>
+      </select>
+      <button class="btn btn-ghost" onclick="esportaCSV()">↓ Esporta CSV</button>
+    </div>
+    <div class="card">
+      <div class="table-wrapper">
+        <table>
+          <thead><tr><th>Codice</th><th>Sconto</th><th>Note</th><th>Creato</th><th>Scadenza</th><th>Stato</th><th>Data uso</th><th>Usato da</th></tr></thead>
+          <tbody id="archivioBody"></tbody>
+        </table>
+      </div>
+      <div id="archivioEmpty" style="text-align:center;padding:40px;color:var(--text3);display:none">Nessun buono trovato.</div>
+    </div>
+  </div>
+
+  <!-- ADMIN -->
+  <div class="page" id="page-admin">
+    <div class="page-title">Gestione Utenti</div>
+    <div class="page-sub">Aggiungi e gestisci gli utenti del sistema</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+      <div class="card">
+        <div class="card-title">⊕ Nuovo utente</div>
+        <div style="display:flex;flex-direction:column;gap:14px">
+          <div class="field-group"><label class="field-label">Username</label><input type="text" id="newUserName" placeholder="mario.rossi"></div>
+          <div class="field-group"><label class="field-label">Password</label><input type="password" id="newUserPass" placeholder="••••••••"></div>
+          <div class="field-group">
+            <label class="field-label">Ruolo</label>
+            <select id="newUserRole">
+              <option value="operatore">Operatore (solo scansione)</option>
+              <option value="manager">Manager (genera + scansione)</option>
+              <option value="admin">Admin (accesso completo)</option>
+            </select>
+          </div>
+          <button class="btn btn-primary" onclick="aggiungiUtente()">Aggiungi utente</button>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">👥 Utenti attivi</div>
+        <div class="users-list" id="usersList"><div style="color:var(--text3)">Caricamento...</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL CONFERMA DEVALIDA -->
+<div class="modal-overlay" id="modalConfirmDevalida">
+  <div class="modal">
+    <div class="modal-title">⚠ Conferma devalidazione</div>
+    <p style="color:var(--text2);line-height:1.6;margin-bottom:8px">Stai per devalidare il buono:</p>
+    <div id="confirmCodice" style="font-family:monospace;font-size:1.1rem;background:var(--surface2);padding:10px 16px;border-radius:8px;margin:12px 0"></div>
+    <p style="color:var(--text2);font-size:.88rem">Questa operazione è <strong style="color:var(--invalid)">irreversibile</strong>.</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="closeModal('modalConfirmDevalida')">Annulla</button>
+      <button class="btn btn-danger" onclick="confermaDevalida()" id="btnConfermaDevalida">Devalida definitivamente</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ═══════════════════════════════════════════════════
+//  CONFIGURAZIONE API
+// ═══════════════════════════════════════════════════
+// L'URL del backend. In locale usa localhost, in LAN metti l'IP del server.
+// Es: const API = 'http://192.168.1.100:3000/api'
+const API = window.location.origin + '/api';
+
+// ── TOKEN JWT ────────────────────────────────────────
+let authToken = sessionStorage.getItem('qrs_token') || null;
+let currentUser = JSON.parse(sessionStorage.getItem('qrs_user') || 'null');
+let scanFoundCodice = null;
+
+// ── FETCH HELPER ─────────────────────────────────────
+async function apiFetch(path, options = {}) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+  const res = await fetch(API + path, { ...options, headers: { ...headers, ...(options.headers||{}) } });
+  if (res.status === 401) { doLogout(); return null; }
+  return res;
+}
+
+// ── LOGIN ─────────────────────────────────────────────
+async function doLogin() {
+  const username = document.getElementById('loginUser').value.trim();
+  const password = document.getElementById('loginPass').value;
+  const errEl = document.getElementById('loginError');
+  const btn = document.getElementById('btnLogin');
+
+  if (!username || !password) { errEl.textContent = 'Inserisci username e password.'; return; }
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Accesso...';
+  errEl.textContent = '';
+
+  try {
+    const res = await fetch(API + '/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password })
+    });
+    const data = await res.json();
+
+    if (!res.ok) { errEl.textContent = data.error || 'Errore di accesso.'; return; }
+
+    authToken = data.token;
+    currentUser = data.utente;
+    sessionStorage.setItem('qrs_token', authToken);
+    sessionStorage.setItem('qrs_user', JSON.stringify(currentUser));
+
+    initApp();
+  } catch (err) {
+    errEl.textContent = 'Impossibile contattare il server. Verificare la connessione.';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Accedi';
+  }
+}
+
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && !document.getElementById('loginScreen').style.display) doLogin();
+});
+
+function initApp() {
+  document.getElementById('loginScreen').style.display = 'none';
+  document.getElementById('mainApp').style.display = 'block';
+  document.getElementById('topbarUser').textContent = currentUser.username;
+  document.getElementById('topbarRole').textContent = currentUser.ruolo;
+
+  const isAdmin   = currentUser.ruolo === 'admin';
+  const isManager = currentUser.ruolo === 'admin' || currentUser.ruolo === 'manager';
+  document.getElementById('nav-admin').style.display  = isAdmin   ? 'flex' : 'none';
+  document.getElementById('nav-genera').style.display = isManager ? 'flex' : 'none';
+
+  const anno = new Date().getFullYear();
+  document.getElementById('genScadenza').value = `${anno}-12-31`;
+
+  goPage('dashboard');
+}
+
+function doLogout() {
+  authToken = null; currentUser = null;
+  sessionStorage.removeItem('qrs_token');
+  sessionStorage.removeItem('qrs_user');
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('mainApp').style.display = 'none';
+  document.getElementById('loginUser').value = '';
+  document.getElementById('loginPass').value = '';
+  document.getElementById('loginError').textContent = '';
+}
+
+// Auto-login se già loggato
+if (authToken && currentUser) initApp();
+
+// ── NAVIGAZIONE ───────────────────────────────────────
+function goPage(name) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + name)?.classList.add('active');
+  document.getElementById('nav-' + name)?.classList.add('active');
+
+  if (name === 'dashboard') loadDashboard();
+  if (name === 'archivio')  loadArchivio();
+  if (name === 'admin')     loadUtenti();
+  if (name === 'scansiona') {
+    document.getElementById('scanCode').value = '';
+    resetScanResult();
+    setTimeout(() => document.getElementById('scanCode').focus(), 100);
+  }
+}
+
+// ── DASHBOARD ─────────────────────────────────────────
+async function loadDashboard() {
+  try {
+    const [statsRes, recentiRes] = await Promise.all([
+      apiFetch('/buoni/stats'),
+      apiFetch('/buoni/recenti')
+    ]);
+    if (!statsRes || !recentiRes) return;
+
+    const stats   = await statsRes.json();
+    const recenti = await recentiRes.json();
+
+    document.getElementById('stat-total').textContent   = stats.totale   || 0;
+    document.getElementById('stat-valid').textContent   = stats.validi   || 0;
+    document.getElementById('stat-used').textContent    = stats.usati    || 0;
+    document.getElementById('stat-expired').textContent = stats.scaduti  || 0;
+
+    const tbody = document.getElementById('dashboardBody');
+    if (!recenti.length) {
+      tbody.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:30px">Nessun buono ancora generato.</td></tr>';
+      return;
+    }
+    tbody.innerHTML = recenti.map(b => `<tr>
+      <td><span class="code-mono">${b.codice}</span></td>
+      <td><strong>${b.tipo === '%' ? b.valore + '%' : '€' + b.valore}</strong></td>
+      <td style="color:var(--text2)">${b.note || '—'}</td>
+      <td style="color:var(--text2)">${formatDate(b.scadenza)}</td>
+      <td>${badgeStato(b.stato_effettivo)}</td>
+    </tr>`).join('');
+  } catch(e) { console.error(e); }
+}
+
+// ── GENERA QR ─────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('genValore').addEventListener('input', updatePreview);
+  document.getElementById('genTipo').addEventListener('change', updatePreview);
+});
+
+function updatePreview() {
+  const v = document.getElementById('genValore').value;
+  const t = document.getElementById('genTipo').value;
+  if (!v) { document.getElementById('previewSconto').textContent = '—'; document.getElementById('previewLabel').textContent = 'inserisci il valore sconto'; return; }
+  document.getElementById('previewSconto').textContent = t === '%' ? `${v}%` : `€ ${v}`;
+  document.getElementById('previewLabel').textContent  = t === '%' ? 'sconto percentuale' : 'sconto importo fisso';
+}
+
+async function generaQR() {
+  const valore   = parseFloat(document.getElementById('genValore').value);
+  const tipo     = document.getElementById('genTipo').value;
+  const quantita = parseInt(document.getElementById('genQuantita').value);
+  const scadenza = document.getElementById('genScadenza').value;
+  const note     = document.getElementById('genNote').value.trim();
+  const azienda  = document.getElementById('genAzienda').value.trim() || 'QR Sconti';
+
+  if (!valore || valore <= 0)             { showToast('Inserisci un valore sconto valido', 'error'); return; }
+  if (!scadenza)                          { showToast('Inserisci una data di scadenza', 'error'); return; }
+  if (!quantita || quantita < 1 || quantita > 500) { showToast('Quantità tra 1 e 500', 'error'); return; }
+
+  const btn = document.getElementById('btnGenera');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Generazione...';
+  document.getElementById('genProgress').style.display = 'block';
+  document.getElementById('genProgressFill').style.width = '10%';
+  document.getElementById('genProgressLabel').textContent = 'Invio richiesta al server...';
+
+  try {
+    const res = await apiFetch('/buoni/genera', {
+      method: 'POST',
+      body: JSON.stringify({ valore, tipo, quantita, scadenza, note, azienda })
+    });
+    if (!res) return;
+
+    document.getElementById('genProgressFill').style.width = '50%';
+    document.getElementById('genProgressLabel').textContent = 'Creazione PDF...';
+
+    const data = await res.json();
+    if (!res.ok) { showToast(data.error || 'Errore generazione', 'error'); return; }
+
+    await creaPDF(data.buoni, azienda);
+
+    document.getElementById('genProgressFill').style.width = '100%';
+    document.getElementById('genProgressLabel').textContent = 'Completato!';
+    await sleep(500);
+    document.getElementById('genProgress').style.display = 'none';
+    showToast(`✓ ${data.generati} buoni generati e PDF scaricato!`, 'success');
+  } catch(e) {
+    showToast('Errore di connessione al server', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = '⊕ Genera &amp; Scarica PDF';
+  }
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+async function creaPDF(buoni, azienda) {
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
+  const W=210, cardW=(W-30)/2, cardH=75, perPage=6;
+
+  for (let i=0; i<buoni.length; i++) {
+    const b = buoni[i];
+    const posInPage = i % perPage;
+    if (posInPage === 0 && i !== 0) doc.addPage();
+    const col = posInPage % 2, row = Math.floor(posInPage / 2);
+    const x = 10 + col*(cardW+10), y = 10 + row*(cardH+10);
+
+    doc.setFillColor(18,18,26);
+    doc.roundedRect(x,y,cardW,cardH,4,4,'F');
+    doc.setFillColor(108,99,255);
+    doc.roundedRect(x,y,cardW,3,1,1,'F');
+
+    doc.setTextColor(144,144,176); doc.setFontSize(7); doc.setFont('helvetica','bold');
+    doc.text(azienda.toUpperCase(), x+5, y+9);
+
+    const scontoText = b.tipo==='%' ? `${b.valore}%` : `€${b.valore}`;
+    doc.setTextColor(108,99,255); doc.setFontSize(22); doc.setFont('helvetica','bold');
+    doc.text(scontoText, x+5, y+22);
+    doc.setTextColor(67,232,176); doc.setFontSize(8); doc.setFont('helvetica','normal');
+    doc.text('DI SCONTO', x+5, y+28);
+
+    if (b.note) { doc.setTextColor(144,144,176); doc.setFontSize(6.5); doc.text(b.note.substring(0,40), x+5, y+34); }
+
+    doc.setTextColor(100,100,120); doc.setFontSize(6);
+    doc.text(`Valido fino al: ${formatDate(b.scadenza)}`, x+5, y+40);
+    doc.setTextColor(200,200,220); doc.setFontSize(7); doc.setFont('courier','bold');
+    doc.text(b.codice, x+5, y+46);
+
+    try {
+      const c = document.createElement('canvas');
+      await QRCode.toCanvas(c, b.codice, { width:80, margin:1, color:{dark:'#000000',light:'#ffffff'} });
+      doc.addImage(c.toDataURL('image/png'),'PNG', x+cardW-28, y+3, 25, 25);
+    } catch(e) {}
+
+    doc.setDrawColor(42,42,69); doc.setLineWidth(0.3);
+    doc.roundedRect(x,y,cardW,cardH,4,4,'S');
+
+    const pct = 50 + (i/buoni.length)*50;
+    document.getElementById('genProgressFill').style.width = pct + '%';
+    if (i%5===0) await sleep(0);
+  }
+  doc.save(`buoni_sconto_${new Date().toISOString().slice(0,10)}.pdf`);
+}
+
+// ── SCANSIONA ─────────────────────────────────────────
+async function cercaBuono() {
+  const codice = document.getElementById('scanCode').value.trim().toUpperCase();
+  if (!codice) { showToast('Inserisci un codice', 'error'); return; }
+
+  const btn = document.getElementById('btnCerca');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
+
+  const result = document.getElementById('scanResult');
+  const actionCard = document.getElementById('scanActionCard');
+  scanFoundCodice = null;
+
+  try {
+    const res = await apiFetch(`/buoni/${codice}`);
+    if (!res) return;
+    const data = await res.json();
+
+    if (res.status === 404) {
+      result.className = 'scan-result invalid';
+      result.innerHTML = `<div class="result-icon">✗</div><div class="result-title" style="color:var(--invalid)">Codice non trovato</div><div class="result-detail">Il codice <strong>${codice}</strong> non esiste.<br>Potrebbe essere contraffatto.</div>`;
+      actionCard.style.display = 'none';
+      return;
+    }
+
+    const b = data;
+    const stato = b.stato_effettivo;
+
+    if (stato === 'usato') {
+      result.className = 'scan-result used';
+      result.innerHTML = `<div class="result-icon">⊘</div><div class="result-title" style="color:var(--warning)">Già utilizzato</div><div class="result-discount">${b.tipo==='%'?b.valore+'%':'€'+b.valore}</div><div class="result-detail">Usato il ${formatDatetime(b.usato_il)}<br>da: <strong>${b.usato_da}</strong></div>`;
+      actionCard.style.display = 'none';
+      return;
+    }
+    if (stato === 'scaduto') {
+      result.className = 'scan-result invalid';
+      result.innerHTML = `<div class="result-icon">⊘</div><div class="result-title" style="color:var(--invalid)">Buono scaduto</div><div class="result-discount">${b.tipo==='%'?b.valore+'%':'€'+b.valore}</div><div class="result-detail">Scaduto il ${formatDate(b.scadenza)}</div>`;
+      actionCard.style.display = 'none';
+      return;
+    }
+
+    // VALIDO
+    result.className = 'scan-result valid';
+    result.innerHTML = `<div class="result-icon">✓</div><div class="result-title" style="color:var(--valid)">Buono Valido!</div><div class="result-discount">${b.tipo==='%'?b.valore+'%':'€'+b.valore} di sconto</div><div class="result-detail">Codice: <strong>${b.codice}</strong><br>${b.note?'Note: '+b.note+'<br>':''}Scade il: ${formatDate(b.scadenza)}</div>`;
+    scanFoundCodice = codice;
+    document.getElementById('confirmCodice').textContent = codice;
+    actionCard.style.display = 'block';
+
+  } catch(e) {
+    showToast('Errore di connessione al server', 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = '🔍 Cerca buono';
+  }
+}
+
+function devalidaBuono() {
+  if (!scanFoundCodice) return;
+  openModal('modalConfirmDevalida');
+}
+
+async function confermaDevalida() {
+  if (!scanFoundCodice) return;
+  const btn = document.getElementById('btnConfermaDevalida');
+  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
+
+  try {
+    const res = await apiFetch(`/buoni/${scanFoundCodice}/devalida`, { method:'POST' });
+    if (!res) return;
+    const data = await res.json();
+
+    if (!res.ok) { showToast(data.error || 'Errore devalidazione', 'error'); return; }
+
+    closeModal('modalConfirmDevalida');
+    document.getElementById('scanActionCard').style.display = 'none';
+    const result = document.getElementById('scanResult');
+    result.className = 'scan-result used';
+    result.innerHTML = `<div class="result-icon">✓</div><div class="result-title" style="color:var(--warning)">Devalidato con successo</div><div class="result-detail">Il buono <strong>${scanFoundCodice}</strong><br>è stato marcato come utilizzato.</div>`;
+    scanFoundCodice = null;
+    showToast('Buono devalidato', 'success');
+  } catch(e) {
+    showToast('Errore di connessione', 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Devalida definitivamente';
+  }
+}
+
+function resetScanResult() {
+  document.getElementById('scanResult').className = 'scan-result';
+  document.getElementById('scanResult').innerHTML = `<div style="font-size:3rem;opacity:.2">⊡</div><div style="color:var(--text3);font-size:.9rem">In attesa di scansione...</div>`;
+  document.getElementById('scanActionCard').style.display = 'none';
+  scanFoundCodice = null;
+}
+
+// ── ARCHIVIO ──────────────────────────────────────────
+let archivioTimer;
+function debounceArchivio() { clearTimeout(archivioTimer); archivioTimer = setTimeout(loadArchivio, 400); }
+
+async function loadArchivio() {
+  const q      = document.getElementById('filterSearch').value.trim();
+  const stato  = document.getElementById('filterStato').value;
+  const params = new URLSearchParams();
+  if (q)     params.set('q', q);
+  if (stato) params.set('stato', stato);
+
+  const tbody = document.getElementById('archivioBody');
+  const empty = document.getElementById('archivioEmpty');
+  tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text3);padding:20px">Caricamento...</td></tr>';
+  empty.style.display = 'none';
+
+  try {
+    const res = await apiFetch('/buoni?' + params.toString());
+    if (!res) return;
+    const data = await res.json();
+
+    if (!data.buoni.length) {
+      tbody.innerHTML = '';
+      empty.style.display = 'block';
+      return;
+    }
+
+    tbody.innerHTML = data.buoni.map(b => `<tr>
+      <td><span class="code-mono">${b.codice}</span></td>
+      <td><strong>${b.tipo==='%'?b.valore+'%':'€'+b.valore}</strong></td>
+      <td style="color:var(--text2);font-size:.85rem">${b.note||'—'}</td>
+      <td style="color:var(--text2);font-size:.82rem">${formatDate(b.creato_il)}</td>
+      <td style="color:var(--text2);font-size:.82rem">${formatDate(b.scadenza)}</td>
+      <td>${badgeStato(b.stato_effettivo)}</td>
+      <td style="color:var(--text2);font-size:.82rem">${b.usato_il?formatDate(b.usato_il):'—'}</td>
+      <td style="color:var(--text2);font-size:.82rem">${b.usato_da||'—'}</td>
+    </tr>`).join('');
+  } catch(e) {
+    tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--invalid);padding:20px">Errore di connessione al server.</td></tr>';
+  }
+}
+
+async function esportaCSV() {
+  window.open(API + '/buoni/export/csv', '_blank');
+}
+
+// ── ADMIN ─────────────────────────────────────────────
+async function loadUtenti() {
+  const list = document.getElementById('usersList');
+  list.innerHTML = '<div style="color:var(--text3)">Caricamento...</div>';
+  try {
+    const res = await apiFetch('/auth/utenti');
+    if (!res) return;
+    const utenti = await res.json();
+    list.innerHTML = utenti.map(u => `
+      <div class="user-row">
+        <div class="user-info">
+          <div class="user-name">${u.username}</div>
+          <div class="user-meta">Ruolo: <strong>${u.ruolo}</strong> · Creato: ${formatDate(u.creato_il)}</div>
+        </div>
+        ${u.id !== currentUser.id
+          ? `<button class="btn btn-danger" style="padding:6px 14px;font-size:.8rem" onclick="eliminaUtente(${u.id})">Rimuovi</button>`
+          : '<span style="color:var(--text3);font-size:.8rem">(tu)</span>'}
+      </div>`).join('');
+  } catch(e) {
+    list.innerHTML = '<div style="color:var(--invalid)">Errore caricamento utenti.</div>';
+  }
+}
+
+async function aggiungiUtente() {
+  const username = document.getElementById('newUserName').value.trim();
+  const password = document.getElementById('newUserPass').value;
+  const ruolo    = document.getElementById('newUserRole').value;
+  if (!username || !password) { showToast('Compila tutti i campi', 'error'); return; }
+
+  try {
+    const res = await apiFetch('/auth/utenti', { method:'POST', body:JSON.stringify({ username, password, ruolo }) });
+    if (!res) return;
+    const data = await res.json();
+    if (!res.ok) { showToast(data.error || 'Errore', 'error'); return; }
+    document.getElementById('newUserName').value = '';
+    document.getElementById('newUserPass').value = '';
+    loadUtenti();
+    showToast(`Utente "${username}" aggiunto`, 'success');
+  } catch(e) { showToast('Errore di connessione', 'error'); }
+}
+
+async function eliminaUtente(id) {
+  if (!confirm('Sei sicuro di voler disabilitare questo utente?')) return;
+  try {
+    const res = await apiFetch(`/auth/utenti/${id}`, { method:'DELETE' });
+    if (!res) return;
+    if (res.ok) { loadUtenti(); showToast('Utente disabilitato', 'success'); }
+  } catch(e) { showToast('Errore', 'error'); }
+}
+
+// ── HELPERS ───────────────────────────────────────────
+function formatDate(d) {
+  if (!d) return '—';
+  const s = typeof d === 'string' ? d.slice(0,10) : d;
+  const [y,m,g] = s.split('-');
+  return `${g}/${m}/${y}`;
+}
+function formatDatetime(d) {
+  if (!d) return '—';
+  const dt = new Date(d);
+  return `${dt.toLocaleDateString('it-IT')} ${dt.toLocaleTimeString('it-IT',{hour:'2-digit',minute:'2-digit'})}`;
+}
+function badgeStato(s) {
+  const map  = { valido:'badge-valid', usato:'badge-used', scaduto:'badge-expired' };
+  const icon = { valido:'✓', usato:'⊘', scaduto:'⊗' };
+  return `<span class="badge ${map[s]||'badge-expired'}">${icon[s]||'?'} ${s||'—'}</span>`;
+}
+
+// ── TOAST ─────────────────────────────────────────────
+let toastTimer;
+function showToast(msg, type='success') {
+  const t = document.getElementById('toast');
+  t.textContent = (type==='success'?'✓ ':'✗ ') + msg;
+  t.className = `show ${type}`;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>{ t.className=''; }, 3000);
+}
+
+// ── MODALS ────────────────────────────────────────────
+function openModal(id)  { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(m => {
+  m.addEventListener('click', e => { if (e.target===m) m.classList.remove('open'); });
+});
+</script>
+</body>
+</html>
