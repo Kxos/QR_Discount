@@ -263,14 +263,15 @@ router.get('/export/csv', requireAuth, requireRuolo('admin', 'manager'), async (
       ORDER BY b.creato_il DESC
     `);
 
+    const sep = ';'; // Punto e virgola per compatibilità Excel italiano
     const headers = ['Codice','Sconto','Note','Azienda','Creato il','Scadenza','Stato','Usato il','Usato da'];
     const csv = [
-      headers.join(','),
+      headers.join(sep),
       ...rows.map(r => [
         r.codice, r.sconto, `"${r.note||''}"`, `"${r.azienda||''}"`,
         r.creato_il, r.scadenza, r.stato,
         r.usato_il||'', r.usato_da||''
-      ].join(','))
+      ].join(sep))
     ].join('\n');
 
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
