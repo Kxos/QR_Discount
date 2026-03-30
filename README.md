@@ -4,6 +4,10 @@ Applicazione web per la **generazione e devalidazione di buoni sconto con QR cod
 
 **Stack:** Node.js · Express · PostgreSQL (Supabase) · JWT
 
+Servizio di **hosting**: Render.
+
+Accessibile qui: https://qr-discount.onrender.com/
+
 ---
 
 ## Funzionalità
