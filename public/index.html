@@ -671,9 +671,9 @@
         doc.addImage(logo, 'JPEG', x, y, logoWidth, logoHeight);
 
         // BUONO SCONTO
-        doc.setTextColor(30, 30, 30); doc.setFontSize(26); doc.setFont('helvetica','bold');
-        doc.text('BUONO', rx, 52);
-        doc.text('SCONTO', rx, 63);
+        doc.setTextColor(30, 30, 30); doc.setFontSize(46); doc.setFont('helvetica','bold');
+        doc.text('BUONO', rx, 62);
+        doc.text('SCONTO', rx, 77);
 
         // Percentuale grande corsiva
         doc.setFontSize(72); doc.setFont('helvetica','bolditalic');
@@ -704,6 +704,15 @@
         doc.text(`${azienda}`, rx, 185);
         doc.text(`Via Stazione, 4 - 38015 Lavis (TN)`, rx, 188);
         doc.text(`0461 246408 - info@fal.tn.it – www.fal.tn.it`, rx, 191);
+
+        // Immagine a destra del footer
+        const footerImg = "footer_logo.jpeg";
+        const imgWidth = 35;
+        const imgHeight = 15;
+        // allineata verticalmente alla prima riga del footer (185)
+        const imgX = W - imgWidth - 20; // margine destro 20mm
+        const imgY = 178;
+        doc.addImage(footerImg, 'JPEG', imgX, imgY, imgWidth, imgHeight);
 
         // QR Code in alto a destra
         try {
@@ -737,12 +746,12 @@
         doc.addImage(logo, 'JPEG', x, y, logoWidth, logoHeight);
 
         // BUONO SCONTO
-        doc.setTextColor(20, 20, 20); doc.setFontSize(26); doc.setFont('helvetica','bold');
-        doc.text('BUONO', rx, 52);
-        doc.text('SCONTO', rx, 63);
+        doc.setTextColor(30, 30, 30); doc.setFontSize(46); doc.setFont('helvetica','bold');
+        doc.text('BUONO', rx, 62);
+        doc.text('SCONTO', rx, 77);
 
         // Percentuale grande corsiva
-        doc.setFontSize(72); doc.setFont('helvetica','bolditalic');
+        doc.setFontSize(86); doc.setFont('helvetica','bolditalic');
         doc.setTextColor(20, 20, 20);
         const scontoText = b.tipo==='%' ? `${b.valore}%` : `€${b.valore}`;
         doc.text(scontoText, rx, 112);
@@ -770,6 +779,15 @@
         doc.text(`${azienda}`, rx, 185);
         doc.text(`Via Stazione, 4 - 38015 Lavis (TN)`, rx, 188);
         doc.text(`0461 246408 - info@fal.tn.it – www.fal.tn.it`, rx, 191);
+
+        // Immagine a destra del footer
+        const footerImg = "footer_logo.jpeg";
+        const imgWidth = 35;
+        const imgHeight = 15;
+        // allineata verticalmente alla prima riga del footer (185)
+        const imgX = W - imgWidth - 20; // margine destro 20mm
+        const imgY = 178;
+        doc.addImage(footerImg, 'JPEG', imgX, imgY, imgWidth, imgHeight);
 
         // QR Code
         try {
