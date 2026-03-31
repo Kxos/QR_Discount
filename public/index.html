@@ -727,10 +727,14 @@
         const rx = W/2 + 20, rw = W/2 - 30;
 
         // Logo FAL
-        doc.setTextColor(20, 20, 20); doc.setFontSize(28); doc.setFont('helvetica','bold');
-        doc.text('FAL', W/2 + rw/2 + 10, 28, {align:'center'});
-        doc.setFontSize(7); doc.setFont('helvetica','normal');
-        doc.text('Sosteniamo i tuoi progetti', W/2 + rw/2 + 10, 34, {align:'center'});
+        const logo = "logo_fal.jpeg";
+        const logoWidth = 40;
+        const logoHeight = 20;
+        const centerX = W/2 + rw/2 + 10;
+        // per centrare l'immagine come il testo
+        const x = centerX - (logoWidth / 2);
+        const y = 18; // regola questo per allinearlo verticalmente
+        doc.addImage(logo, 'JPEG', x, y, logoWidth, logoHeight);
 
         // BUONO SCONTO
         doc.setTextColor(20, 20, 20); doc.setFontSize(26); doc.setFont('helvetica','bold');
